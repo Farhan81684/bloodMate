@@ -20,6 +20,12 @@ app.get("/", (req, res) => {
     res.send("welcome to LOADBOAD apis");
 });
 
+
+// routes
+
+const userRoutes = require("./src/routes/userRoutes");
+app.use("/user", userRoutes);
+
 //server
 
 app.listen(process.env.PORT, () => {
