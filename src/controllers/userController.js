@@ -7,29 +7,41 @@ const transporter = require("../middlewares/nodemailer");
 const Otp = require("../models/otpModel");
 
 
-//signup
 exports.signup = async (req, res) => {
     try {
         const { email, password } = req.body;
-        //check if email is uniqque
-        const user = await User.findOne({ email });
 
-        if (user) {
-            return res.status(400).json({ message: "Email already exists" });
+        // Check for missing fields
+        if (!email || !password) {
+            return res.status(400).json({ success: false, message: "Email and password are required" });
         }
+
+        // Check if user already exists
+        const userExists = await User.findOne({ email });
+        if (userExists) {
+            return res.status(400).json({ success: false, message: "User already exists" });
+        }
+
+        // Validate email format
         const emailValidation = validateEmail(email);
         if (!emailValidation.isValid) {
-            return res.status(400).json({ message: emailValidation.error });
+            return res.status(400).json({ success: false, message: emailValidation.error });
         }
+
+        // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Create and save new user
         const newUser = new User({ email, password: hashedPassword });
         await newUser.save();
-        res.status(200).json({ message: "Signup successful" });
+
+        return res.status(201).json({ success: true, message: "Signup successful", user: newUser });
+
     } catch (error) {
-        console.log(error);
-        res.status(500).json({ message: "Internal server error" });
+        console.error("Signup Error:", error);
+        return res.status(500).json({ success: false, message: "Internal server error" });
     }
-}
+};
 
 //login
 exports.login = async (req, res) => {
@@ -88,19 +100,15 @@ exports.forgotPassword = async (req, res) => {
 //reset password
 exports.resetPassword = async (req, res) => {
     const { email, password } = req.body;
+    console.log(email, password);
     try {
         const user = await User.findOne({ email });
         if (!user) {
             return res.status(400).json({ message: "Account not found" });
         }
 
-        //check otp is verified
-        const otpData = await Otp.findOne({ email });
-        if (otpData.isVerified === false || !otpData) {
-            return res.status(400).json({ message: "Email is not verified or session has expired please verify again" });
-        }
-
         const hashedPassword = await bcrypt.hash(password, 10);
+        console.log(hashedPassword);
         user.password = hashedPassword;
         await user.save();
         res.status(200).json({ message: "Password reset successful" });
@@ -190,8 +198,9 @@ exports.updateProfile = async (req, res) => {
 // get user details
 
 exports.getUserDetails = async (req, res) => {
-    const userId = req.user.userId;
     try {
+        const userId = req.user.userId;
+
         const user = await User.findOne({ _id: userId });
         if (!user) {
             return res.status(400).json({ message: "Account not found" });
@@ -225,3 +234,120 @@ exports.changePassword = async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 }
+
+
+//togle notification
+exports.toggleNotification = async (req, res) => {
+    const userId = req.user.userId;
+    try {
+        const user = await User.findOne({ _id: userId });
+        if (!user) {
+            return res.status(400).json({ message: "Account not found" });
+        }
+        user.toggleNotification = !user.toggleNotification;
+        await user.save();
+        res.status(200).json({ message: "Notification toggled successfully", user });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+
+//toggle blood request
+exports.toggleBloodRequest = async (req, res) => {
+    const userId = req.user.userId;
+    try {
+        const user = await User.findOne({ _id: userId });
+        if (!user) {
+            return res.status(400).json({ message: "Account not found" });
+        }
+        user.toggleBloodRequest = !user.toggleBloodRequest;
+        await user.save();
+        res.status(200).json({ message: "Blood request toggled successfully", user });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+// add profile pic
+exports.addProfilePic = async (req, res) => {
+    const userId = req.user.userId;
+    try {
+        const user = await User.findOne({ _id: userId });
+        if (!user) {
+            return res.status(400).json({ message: "Account not found" });
+        }
+        const profile = req.file ? req.file.path : null;
+        user.profilePic = profile || user.profilePic;
+        await user.save();
+        res.status(200).json({ message: "Profile picture added successfully", user });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+// setup profile controller
+exports.setupProfile = async (req, res) => {
+    const { phoneNumber, address, bloodGroup } = req.body;
+    const userId = req.user.userId;
+
+    try {
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(400).json({ message: "Account not found" });
+        }
+
+        if (phoneNumber) user.phoneNo = phoneNumber;
+        if (address) user.address = address;
+        if (bloodGroup) user.bloodGroup = bloodGroup;
+
+        await user.save();
+
+        res.status(200).json({
+            message: "Profile setup successfully",
+            user,
+        });
+    } catch (error) {
+        console.log("Error in setupProfile:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+
+exports.addAddress = async (req, res) => {
+    const { address } = req.body;
+    const userId = req.user.userId;
+    try {
+        const user = await User.findOne({ _id: userId });
+        if (!user) {
+            return res.status(400).json({ message: "Account not found" });
+        }
+        user.address = address;
+        await user.save();
+        res.status(200).json({ message: "Address added successfully", user });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+//get user details
+exports.getUserDetails = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const user = await User.findOne({ _id: userId });
+        if (!user) {
+            return res.status(400).json({ message: "Account not found" });
+        }
+        res.status(200).json({ message: "User details fetched successfully", user });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+

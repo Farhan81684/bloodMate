@@ -4,7 +4,6 @@ const userSchema = new mongoose.Schema({
 
     name: {
         type: String,
-        required: [true, "Name is required"]
     },
     profile: {
         type: String,
@@ -12,11 +11,32 @@ const userSchema = new mongoose.Schema({
     },
     email: {
         type: String,
-        required: [true, "Email is required"],
         unique: true
     },
     password: {
         type: String,
-        required: [true, "Password is required"]
-    }
+    },
+    phoneNo: {
+        type: String,
+    },
+    address: {
+        type: String,
+
+    },
+    toggleNotification: {
+        type: Boolean,
+        default: true
+    },
+    toggleBloodRequest: {
+        type: Boolean,
+        default: true
+    },
+    bloodGroup: {
+        type: String,
+
+    },
+
 });
+
+//export model
+module.exports = mongoose.model('User', userSchema);
