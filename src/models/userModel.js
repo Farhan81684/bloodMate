@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
-
     name: {
         type: String,
     },
@@ -21,7 +20,6 @@ const userSchema = new mongoose.Schema({
     },
     address: {
         type: String,
-
     },
     toggleNotification: {
         type: Boolean,
@@ -33,10 +31,10 @@ const userSchema = new mongoose.Schema({
     },
     bloodGroup: {
         type: String,
+        enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
 
     },
-
 });
 
-//export model
+// export model
 module.exports = mongoose.model('User', userSchema);

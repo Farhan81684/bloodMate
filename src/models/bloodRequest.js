@@ -12,7 +12,9 @@ const bloodRequestSchema = new mongoose.Schema({
     },
     BloodType: {
         type: String,
-        required: true
+        required: true,
+        enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
+
     },
     Age: {
         type: Number,

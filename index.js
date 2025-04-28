@@ -11,6 +11,9 @@ const { initSocket } = require("./src/utils/socket");
 app.use(cors());
 app.use(express.json());
 
+//static uploads
+app.use("/uploads", express.static("uploads"));
+
 //dabatase connection
 const databaseConnection = require("./src/config/dataBase");
 databaseConnection();

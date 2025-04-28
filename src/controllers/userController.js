@@ -213,6 +213,7 @@ exports.getUserDetails = async (req, res) => {
         if (!user) {
             return res.status(400).json({ message: "Account not found" });
         }
+        console.log(user)
         res.status(200).json({ message: "User details fetched successfully", user });
     } catch (error) {
         console.log(error);
@@ -247,6 +248,8 @@ exports.changePassword = async (req, res) => {
 //togle notification
 exports.toggleNotification = async (req, res) => {
     const userId = req.user.userId;
+    console.log(userId);
+    console.log("toggleNotification called")
     try {
         const user = await User.findOne({ _id: userId });
         if (!user) {
@@ -279,23 +282,6 @@ exports.toggleBloodRequest = async (req, res) => {
     }
 }
 
-// add profile pic
-exports.addProfilePic = async (req, res) => {
-    const userId = req.user.userId;
-    try {
-        const user = await User.findOne({ _id: userId });
-        if (!user) {
-            return res.status(400).json({ message: "Account not found" });
-        }
-        const profile = req.file ? req.file.path : null;
-        user.profilePic = profile || user.profilePic;
-        await user.save();
-        res.status(200).json({ message: "Profile picture added successfully", user });
-    } catch (error) {
-        console.log(error);
-        res.status(500).json({ message: "Internal server error" });
-    }
-}
 
 // setup profile controller
 exports.setupProfile = async (req, res) => {
@@ -370,6 +356,7 @@ exports.getUserDetails = async (req, res) => {
 exports.changePassword = async (req, res) => {
     const { oldPassword, newPassword } = req.body;
     const userId = req.user.userId;
+    console.log("Change password called", req.body);
     try {
         const user = await User.findOne({ _id: userId });
         if (!user) {
@@ -386,5 +373,31 @@ exports.changePassword = async (req, res) => {
     } catch (error) {
         console.log(error);
         res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+
+//get users according to their blood group
+
+exports.getUsersByBloodGroup = async (req, res) => {
+    try {
+        const { bloodGroup } = req.query;
+
+        // If blood group is provided, filter users by blood group
+        let query = {};
+        if (bloodGroup) {
+            query.bloodGroup = bloodGroup;
+        }
+
+        const users = await User.find(query);
+
+        res.status(200).json({
+            success: true,
+            count: users.length,
+            users,
+        });
+    } catch (error) {
+        console.error(error.message);
+        res.status(500).json({ success: false, message: 'Server Error' });
     }
 }

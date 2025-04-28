@@ -12,11 +12,14 @@ router.put('/resetpassword', userController.resetPassword);
 // router.put('/updateprofile', userController.updateProfile);
 router.put('/resendOtp', userController.resendOtp);
 router.post('/togleNotification', authMiddleware, userController.toggleNotification);
-router.post('/setupProfile', authMiddleware, upload.single('profilePic'), userController.setupProfile);
+router.post('/setupProfile', authMiddleware, upload.single('profile'), userController.setupProfile);
 router.post('/toggleBloodRequest', authMiddleware, userController.toggleBloodRequest);
 router.get('/me', authMiddleware, userController.getUserDetails);
 // router.post('/addAddress', authMiddleware, userController.addAddress);
 // router.post('/updateProfile', authMiddleware, upload.single('profilePic'), userController.updateProfile);
+
+router.put('/changePassword', authMiddleware, userController.changePassword);
+router.post('/getUsersByBloodGroup', authMiddleware, userController.getUsersByBloodGroup);
 
 
 

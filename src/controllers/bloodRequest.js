@@ -10,8 +10,8 @@ const { sendNotification } = require('../utils/socket');
 
 exports.BloodRequest = async (req, res) => {
     try {
+        const userId = req.user.userId; // Get the user ID from the authenticated user
         const {
-            userId,
             patientName,
             BloodType,
             Age,
@@ -72,3 +72,59 @@ exports.BloodRequest = async (req, res) => {
 }
 
 
+//get all blood requests
+exports.getAllBloodRequests = async (req, res) => {
+    try {
+        const bloodRequests = await BloodRequest.find().populate('userId', 'name profile bloodGroup phoneNo address toggleNotification toggleBloodRequest');
+        return res.status(200).json({
+            success: true,
+            message: 'All blood requests fetched successfully.',
+            data: bloodRequests
+        });
+    } catch (error) {
+        console.error('Error fetching blood requests:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Internal server error'
+        });
+    }
+}
+
+//get blood request by blood group
+exports.getBloodRequestByBloodGroup = async (req, res) => {
+    try {
+        const { bloodGroup } = req.query;
+        const bloodRequests = await BloodRequest.find({ BloodType: bloodGroup }).populate('userId', 'name profile bloodGroup phoneNo address toggleNotification toggleBloodRequest');
+        return res.status(200).json({
+            success: true,
+            message: `Blood requests for ${bloodGroup} fetched successfully.`,
+            data: bloodRequests
+        });
+    } catch (error) {
+        console.error('Error fetching blood requests:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Internal server error'
+        });
+    }
+}
+
+
+//get my blood requests
+exports.getMyBloodRequests = async (req, res) => {
+    try {
+        const userId = req.user.userId; // Get the user ID from the authenticated user
+        const bloodRequests = await BloodRequest.find({ userId }).populate('userId', 'name profile bloodGroup phoneNo address toggleNotification toggleBloodRequest');
+        return res.status(200).json({
+            success: true,
+            message: 'My blood requests fetched successfully.',
+            data: bloodRequests
+        });
+    } catch (error) {
+        console.error('Error fetching my blood requests:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Internal server error'
+        });
+    }
+}
