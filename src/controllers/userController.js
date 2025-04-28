@@ -9,10 +9,12 @@ const Otp = require("../models/otpModel");
 
 exports.signup = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { name, email, password } = req.body;
+
+        console.log("Signup data:", req.body);
 
         // Check for missing fields
-        if (!email || !password) {
+        if (!email || !name || !password) {
             return res.status(400).json({ success: false, message: "Email and password are required" });
         }
 
@@ -32,7 +34,7 @@ exports.signup = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // Create and save new user
-        const newUser = new User({ email, password: hashedPassword });
+        const newUser = new User({ email, name, password: hashedPassword });
         await newUser.save();
 
         return res.status(201).json({ success: true, message: "Signup successful", user: newUser });
@@ -46,6 +48,8 @@ exports.signup = async (req, res) => {
 //login
 exports.login = async (req, res) => {
     const { email, password } = req.body;
+    console.log("Login data:", req.body);
+
     try {
         const user = await User.findOne({ email });
         if (!user) {
@@ -76,6 +80,9 @@ exports.forgotPassword = async (req, res) => {
         if (!user) {
             return res.status(400).json({ message: "Account not found" });
         }
+
+        //delete all previous otp
+        await Otp.deleteMany({ email });
         const otp = generateOTP();
         const otpData = new Otp
             ({
@@ -90,6 +97,7 @@ exports.forgotPassword = async (req, res) => {
             text: `Your OTP is ${otp}`,
         };
         await transporter.sendMail(mailOptions);
+        console.log("OTP sent to email:", email, otp);
         res.status(200).json({ message: "OTP sent successfully", otp: otp });
     } catch (error) {
         console.log(error);
@@ -126,11 +134,11 @@ exports.verifyOTP = async (req, res) => {
             return res.status(400).json({ message: "Account not found" });
         }
         const otpData = await Otp.findOne({ email });
+        console.log(otpData);
+
         if (otpData.otp !== otp) {
             return res.status(400).json({ message: "Invalid OTP" });
         }
-        otpData.isVerified = true;
-        await otpData.save();
         res.status(200).json({ message: "OTP verified successfully" });
     } catch (error) {
         console.log(error);
@@ -291,7 +299,7 @@ exports.addProfilePic = async (req, res) => {
 
 // setup profile controller
 exports.setupProfile = async (req, res) => {
-    const { phoneNumber, address, bloodGroup } = req.body;
+    const { phoneNumber, address, bloodGroup, name } = req.body;
     const userId = req.user.userId;
 
     try {
@@ -300,7 +308,14 @@ exports.setupProfile = async (req, res) => {
         if (!user) {
             return res.status(400).json({ message: "Account not found" });
         }
+        //handle image upload
 
+        const profile = req.file ? req.file.path : null;
+        if (profile) {
+            user.profile = profile;
+        }
+
+        if (name) user.name = name;
         if (phoneNumber) user.phoneNo = phoneNumber;
         if (address) user.address = address;
         if (bloodGroup) user.bloodGroup = bloodGroup;
@@ -351,3 +366,25 @@ exports.getUserDetails = async (req, res) => {
 }
 
 
+//change password
+exports.changePassword = async (req, res) => {
+    const { oldPassword, newPassword } = req.body;
+    const userId = req.user.userId;
+    try {
+        const user = await User.findOne({ _id: userId });
+        if (!user) {
+            return res.status(400).json({ message: "Account not found" });
+        }
+        const isMatch = await bcrypt.compare(oldPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: "Old password is incorrect" });
+        }
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        user.password = hashedPassword;
+        await user.save();
+        res.status(200).json({ message: "Password changed successfully" });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+}

@@ -5,6 +5,7 @@ const app = express();
 const cors = require("cors");
 const { log } = require("mercedlogger");
 const dotenv = require("dotenv").config();
+const { initSocket } = require("./src/utils/socket");
 
 //middlewares
 app.use(cors());
@@ -20,14 +21,17 @@ app.get("/", (req, res) => {
     res.send("welcome to LOADBOAD apis");
 });
 
+// socket connection
+const server = require("http").createServer(app);
+initSocket(server);
 
 // routes
 
 const userRoutes = require("./src/routes/userRoutes");
-app.use("/user", userRoutes);
+app.use("/api/user", userRoutes);
 
 //server
 
-app.listen(process.env.PORT, () => {
+server.listen(process.env.PORT, () => {
     log.green("server", `server is running on port ${process.env.PORT}`);
 });
