@@ -6,6 +6,7 @@ dotenv.config();
 const db = process.env.DATABASE_URL;
 // console.log("db ==>", process.env.DATABASE_URL);
 const databaseConnection = () => {
+    // console.log("db ==>", db);
     mongoose
         .connect(db, {
             // useNewUrlParser: true,

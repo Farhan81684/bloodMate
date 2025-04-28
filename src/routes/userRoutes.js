@@ -15,7 +15,7 @@ router.post('/togleNotification', authMiddleware, userController.toggleNotificat
 router.post('/setupProfile', authMiddleware, upload.single('profile'), userController.setupProfile);
 router.post('/toggleBloodRequest', authMiddleware, userController.toggleBloodRequest);
 router.get('/me', authMiddleware, userController.getUserDetails);
-// router.post('/addAddress', authMiddleware, userController.addAddress);
+router.post('/addAddress', authMiddleware, userController.addAddress);
 // router.post('/updateProfile', authMiddleware, upload.single('profilePic'), userController.updateProfile);
 
 router.put('/changePassword', authMiddleware, userController.changePassword);
