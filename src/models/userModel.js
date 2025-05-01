@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema({
     },
     profile: {
         type: String,
-        default: "https://www.kindpng.com/picc/m/78-785827_user-profile-avatar-login-person-user-icon-png.png"
+        default: ""
     },
     email: {
         type: String,
