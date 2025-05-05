@@ -1,6 +1,6 @@
 const User = require('../models/userModel');
 const BloodRequest = require('../models/bloodRequest');
-const Notification = require('../models/notificationModel');
+const Notification = require('../models/notificationSchema');
 const { sendNotification } = require('../utils/socket');
 
 
@@ -20,8 +20,10 @@ exports.BloodRequest = async (req, res) => {
             contact
         } = req.body;
 
+        console.log(req.body);
+
         // Validation: check required fields
-        if (!userId || !patientName || !BloodType || !Age || !Disease || !location?.lat || !location?.lng || !contact) {
+        if (!userId || !patientName || !BloodType || !Age || !Disease || !location || !contact) {
             return res.status(400).json({ success: false, message: 'All fields are required.' });
         }
 
@@ -43,7 +45,8 @@ exports.BloodRequest = async (req, res) => {
         for (const user of users) {
             // Create and save notification for each user
             const newNotification = new Notification({
-                userId: user._id,
+                sender: userId,
+                receiver: user._id,
                 title: 'New Blood Request',
                 message: `A new blood request has been created by ${patientName}.`,
                 bloodRequestId: savedBloodRequest._id
@@ -94,7 +97,7 @@ exports.getAllBloodRequests = async (req, res) => {
 exports.getBloodRequestByBloodGroup = async (req, res) => {
     try {
         const { bloodGroup } = req.query;
-        const bloodRequests = await BloodRequest.find({ BloodType: bloodGroup }).populate('userId', 'name profile bloodGroup phoneNo address toggleNotification toggleBloodRequest');
+        const bloodRequests = await BloodRequest.find({ BloodType: bloodGroup }).populate('userId', 'name profile bloodGroup phoneNo address toggleNotification toggleBloodRequest').sort({ createdAt: -1 });
         return res.status(200).json({
             success: true,
             message: `Blood requests for ${bloodGroup} fetched successfully.`,
@@ -114,7 +117,9 @@ exports.getBloodRequestByBloodGroup = async (req, res) => {
 exports.getMyBloodRequests = async (req, res) => {
     try {
         const userId = req.user.userId; // Get the user ID from the authenticated user
+        console.log(userId);
         const bloodRequests = await BloodRequest.find({ userId }).populate('userId', 'name profile bloodGroup phoneNo address toggleNotification toggleBloodRequest');
+        console.log(bloodRequests);
         return res.status(200).json({
             success: true,
             message: 'My blood requests fetched successfully.',

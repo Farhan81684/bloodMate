@@ -25,19 +25,17 @@ const bloodRequestSchema = new mongoose.Schema({
         required: true
     },
     location: {
-        lat: {
-            type: Number,
-            required: true
-        },
-        lng: {
-            type: Number,
-            required: true
-        }
+        type: String,
+        required: true
     },
     contact: {
         type: String,
         required: true
     },
+    createdAt: {
+        type: Date,
+        default: Date.now
+    }
 
 });
 

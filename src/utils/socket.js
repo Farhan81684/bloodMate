@@ -210,7 +210,7 @@ const initSocket = (server) => {
                 newMessage.receiverId = receiverId;  // Add this line to explicitly set receiverId
 
                 // Emit message to receiver
-                io.to(receiverId).emit("received_message",{
+                io.to(receiverId).emit("received_message", {
                     ...newMessage,
                     roomId: chatRoom._id,
                     receiverId: receiverId
@@ -390,7 +390,12 @@ const initSocket = (server) => {
     });
 };
 
-
+//send notification
+const sendNotification = (socketId, event, data) => {
+    if (io) {
+        io.to(socketId).emit(event, data);
+    }
+};
 
 function getIO() {
     if (!io) {
@@ -399,7 +404,7 @@ function getIO() {
     return io;
 }
 
-module.exports = { initSocket, getIO };
+module.exports = { initSocket, getIO, sendNotification };
 
 
 

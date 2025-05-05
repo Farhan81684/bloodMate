@@ -4,6 +4,8 @@ const userController = require('../controllers/userController');
 const authMiddleware = require('../middlewares/auth');
 const upload = require('../middlewares/multer');
 
+const bloodRequestController = require('../controllers/bloodRequest');
+
 router.post('/signup', userController.signup);
 router.post('/login', userController.login);
 router.post('/sendotp', userController.forgotPassword);
@@ -21,6 +23,10 @@ router.post('/addAddress', authMiddleware, userController.addAddress);
 router.put('/changePassword', authMiddleware, userController.changePassword);
 router.post('/getUsersByBloodGroup', authMiddleware, userController.getUsersByBloodGroup);
 
-
+//blood request routes
+router.post('/addBloodRequest', authMiddleware, bloodRequestController.BloodRequest);
+router.get('/getAllBloodRequests', authMiddleware, bloodRequestController.getAllBloodRequests);
+router.get('/getBloodRequestByBloodGroup', authMiddleware, bloodRequestController.getBloodRequestByBloodGroup);
+router.get('/getMyBloodRequests', authMiddleware, bloodRequestController.getMyBloodRequests);
 
 module.exports = router;
