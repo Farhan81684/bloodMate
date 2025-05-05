@@ -1,8 +1,9 @@
 const SocketIo = require("socket.io");
 const fs = require('fs');
 const path = require('path');
-const Message = require('../models/messages.model'); // Adjust the path to your model
 const ChatRoom = require('../models/chatRoomSchema'); // Adjust the path to your model
+const Notification = require('../models/notificationSchema'); // Adjust the path to your model
+const User = require('../models/userModel'); // Adjust the path to your model
 
 
 let io; // To store Socket.IO instance
@@ -16,16 +17,18 @@ const initSocket = (server) => {
         },
     });
 
+
     io.on("connection", (socket) => {
 
         // Handle user joining
-        socket.on("join_room", ({ userId, role }) => {
-            if (!userId || !role) {
+        socket.on("join_room", ({ userId }) => {
+            if (!userId) {
                 return;
             }
 
             const newUser = userId.toString();
-            onlineUsers.set(newUser, { socketId: socket.id, role });
+            onlineUsers.set(newUser, { socketId: socket.id });
+            console.log("onlineUsers", onlineUsers);
 
             socket.join(newUser);
         });
@@ -38,13 +41,11 @@ const initSocket = (server) => {
         }
 
 
-        // Socket handlers updated to work with separate Message and ChatRoom models
 
-        socket.on("send_audio_message", async (formData) => {
+        socket.on("send_audio_message", async (formData) => {  // formData is an object containing senderId, receiverId, and audio file
             try {
                 const { senderId, receiverId } = formData;
-                const audioFile = formData.audio;
-                const donationId = formData.donationId;
+                const audioFile = formData.audio; // This is the file uploaded from the client
 
                 if (!audioFile) {
                     return socket.emit("error", { message: "No audio file provided" });
@@ -57,11 +58,12 @@ const initSocket = (server) => {
                 }
 
                 // Save the audio file
-                const audioName = `${Date.now()}-${senderId}.wav`;
+                const audioName = `${Date.now()}-${senderId}.wav`; // You can change the format if necessary
                 const audioPath = path.join(uploadDir, audioName);
+                console.log('Saving audio to:', audioPath);
 
                 try {
-                    await audioFile.mv(audioPath);
+                    await audioFile.mv(audioPath); // Use a method like 'mv' for file upload (if using `express-fileupload` or other methods)
                 } catch (err) {
                     console.error("Error saving audio:", err);
                     return socket.emit("error", { message: "Failed to save audio" });
@@ -82,62 +84,54 @@ const initSocket = (server) => {
                     chatRoom = new ChatRoom({
                         sender: senderId,
                         receiver: receiverId,
-                        unreadCount: 0
+                        messages: [],
                     });
                     await chatRoom.save();
+                    console.log(`New chat room created between ${senderId} and ${receiverId}`);
                 }
 
-                // Create a new message document
-                const newMessage = new Message({
-                    chatRoom: chatRoom._id,
-                    sender: senderId,
+                // Add the new voice message
+                const newMessage = {
+                    user: senderId,
                     message: null, // No text message
                     audio: audioUrl, // The URL to the audio file
-                });
+                    createdAt: new Date(),
+                };
 
-                // Save the message
-                await newMessage.save();
+                chatRoom.messages.push(newMessage);
 
-                // Update the chat room with the last message reference
-                chatRoom.lastMessage = newMessage._id;
-
-                // Increment unread count if the receiver is not the sender
-                if (receiverId !== senderId) {
-                    chatRoom.unreadCount += 1;
-                }
+                // Update the last message
+                chatRoom.lastMessage = {
+                    user: senderId,
+                    message: "Voice message", // You can customize this if you want
+                    audio: audioUrl,
+                    createdAt: new Date(),
+                };
 
                 await chatRoom.save();
-
-                // Get the populated message to send back
-                const populatedMessage = await Message.findById(newMessage._id)
-                    .populate('sender', 'firstName lastName avatar');
+                console.log('Chat room updated successfully with new audio message');
 
                 // Emit message to receiver
-                io.to(receiverId).emit("received_message", populatedMessage);
+                io.to(receiverId).emit("received_message", newMessage);
 
-                // Get updated chat room with populated fields
                 const updatedChatRoom = await ChatRoom.findById(chatRoom._id)
-                    .populate("sender", "firstName lastName avatar")
-                    .populate("receiver", "firstName lastName avatar")
-                    .populate({
-                        path: "lastMessage",
-                        populate: {
-                            path: "sender",
-                            select: "firstName lastName avatar"
-                        }
-                    });
+                    .populate("sender receiver")
+                    .populate("lastMessage.user");
 
                 io.to(senderId).emit("chat_room_updated", updatedChatRoom);
                 io.to(receiverId).emit("chat_room_updated", updatedChatRoom);
 
             } catch (err) {
                 console.error("Error sending audio message:", err);
-                socket.emit("error", { message: "Failed to send audio message" });
             }
         });
 
         socket.on("send_message", async ({ senderId, receiverId, message, image }) => {
+            console.log("senderId", senderId, "receiverId", receiverId, "message", message);
             try {
+                console.log("senderId", senderId, "receiverId", receiverId, "message", message);
+                console.log("image", image);
+
                 // Handle image upload
                 let imageUrl = null;
                 if (image) {
@@ -149,6 +143,7 @@ const initSocket = (server) => {
                         // Save the image
                         const imageName = `${Date.now()}-${senderId}.jpg`;
                         const imagePath = path.join(uploadDir, imageName);
+                        console.log('Saving image to:', imagePath); // Log the image save path
                         try {
                             fs.writeFileSync(imagePath, buffer); // Write to file system
                         } catch (err) {
@@ -170,72 +165,75 @@ const initSocket = (server) => {
                         { sender: receiverId, receiver: senderId }
                     ]
                 });
+                console.log("exist", chatRoom);
 
                 if (!chatRoom) {
                     chatRoom = new ChatRoom({
                         sender: senderId,
                         receiver: receiverId,
-                        unreadCount: 0
+                        messages: [],
                     });
                     await chatRoom.save();
+                    console.log(`New chat room created between ${senderId} and ${receiverId}`);
                 }
 
-                // Create a new message
-                const newMessage = new Message({
-                    chatRoom: chatRoom._id,
-                    sender: senderId,
+                const sender = await User.findById(senderId).select('profilePicture');
+                console.log("sender", sender);
+                const receiver = await User.findById(receiverId).select('profilePicture');
+                console.log("receiver", receiver);
+
+                // Add the new message
+                const newMessage = {
+                    user: senderId,
                     message,
-                    image: imageUrl
-                });
+                    image: imageUrl,
+                    createdAt: new Date(),
+                };
 
-                // Save the message
-                await newMessage.save();
+                chatRoom.messages.push(newMessage);
 
-                // Update the chat room with the last message reference
-                chatRoom.lastMessage = newMessage._id;
-
-                // Increment unread count if the receiver is not the sender
-                if (receiverId !== senderId) {
-                    chatRoom.unreadCount += 1;
-                }
+                // Update the last message
+                chatRoom.lastMessage = {
+                    user: senderId,
+                    message,
+                    image: imageUrl,
+                    createdAt: new Date(),
+                };
 
                 await chatRoom.save();
 
-                // Get the populated message to send back
-                const populatedMessage = await Message.findById(newMessage._id)
-                    .populate('sender', 'firstName lastName avatar');
+                newMessage.senderProfilePic = sender.profilePicture;
+                newMessage.receiverProfilePic = receiver.profilePicture;
+                console.log("newMessage", newMessage);
+                console.log('Chat room updated successfully with new message');
+                newMessage.roomId = chatRoom._id;  // Add this line after creating newMessage
+                newMessage.receiverId = receiverId;  // Add this line to explicitly set receiverId
 
                 // Emit message to receiver
-                io.to(receiverId).emit("received_message", populatedMessage);
+                io.to(receiverId).emit("received_message",{
+                    ...newMessage,
+                    roomId: chatRoom._id,
+                    receiverId: receiverId
+                });
 
-                // Get updated chat room with populated fields
                 const updatedChatRoom = await ChatRoom.findById(chatRoom._id)
-                    .populate("sender", "firstName lastName avatar")
-                    .populate("receiver", "firstName lastName avatar")
-                    .populate({
-                        path: "lastMessage",
-                        populate: {
-                            path: "sender",
-                            select: "firstName lastName avatar"
-                        }
-                    });
+                    .populate("sender receiver")
+                    .populate("lastMessage.user");
 
-                // Notify receiver about new message
-                const senderName = updatedChatRoom.sender.firstName;
-                io.to(receiverId).emit("newMessage", `New message from ${senderName}: ${message}`);
+                io.to(receiverId).emit("newMessage", `New message from ${updatedChatRoom.sender.firstName}: ${message}`);
 
-                // Update chat room for both users
+
                 io.to(senderId).emit("chat_room_updated", updatedChatRoom);
                 io.to(receiverId).emit("chat_room_updated", updatedChatRoom);
 
             } catch (err) {
                 console.error("Error sending message:", err);
-                socket.emit("error", { message: "Failed to send message" });
             }
         });
-
         // Get all chat rooms for a user
         socket.on("get_chat_rooms", async (userId) => {
+            console.log("recieved chat rooms", userId);
+
             try {
                 const chatRooms = await ChatRoom.find({
                     $or: [
@@ -243,20 +241,14 @@ const initSocket = (server) => {
                         { receiver: userId }
                     ]
                 })
-                    .populate("sender", "firstName lastName avatar")
-                    .populate("receiver", "firstName lastName avatar")
-                    .populate({
-                        path: "lastMessage",
-                        populate: {
-                            path: "sender",
-                            select: "firstName lastName avatar"
-                        }
-                    });
+                    .populate("sender receiver")
+                    .populate("lastMessage.user");
 
                 socket.emit("chat_rooms", chatRooms);
+
+                console.log("chat rooms", chatRooms);
             } catch (err) {
                 console.error("Error getting chat rooms:", err);
-                socket.emit("error", { message: "Failed to get chat rooms" });
             }
         });
 
@@ -267,246 +259,122 @@ const initSocket = (server) => {
                 if (!chatRoom) {
                     return socket.emit("error", { message: "Chat room not found" });
                 }
+                const user = await User.findById(chatRoom.sender);
+                const user2 = await User.findById(chatRoom.receiver);
+                chatRoom.senderProfilePic = user.profilePicture;
+                chatRoom.receiverProfilePic = user2.profilePicture;
+                console.log("chat room messages", chatRoom.messages.toLocaleString);
+                // Emit the messages to the user
+                socket.emit("chat_room_messages", chatRoom.messages);
 
-                // Get messages for this chat room
-                const messages = await Message.find({ chatRoom: roomId })
-                    .populate('sender', 'firstName lastName avatar')
-                // .sort({ createdAt: -1 });
-
-
-                chatRoom.unreadCount = 0;
-                await chatRoom.save();
-
-                socket.emit("chat_room_messages", messages);
             } catch (err) {
                 console.error("Error getting chat room messages:", err);
-                socket.emit("error", { message: "Failed to get chat room messages" });
             }
         });
 
-        // Add a new handler for marking messages as read
-        socket.on("mark_messages_read", async ({ chatRoomId, userId }) => {
+
+        // =========================== notification ===========================
+
+
+        socket.on("send_notification", async ({ senderId, receiverId, message, type, title }) => {
             try {
-                // Find the chat room
-                const chatRoom = await ChatRoom.findById(chatRoomId);
-                if (!chatRoom) {
-                    return socket.emit("error", { message: "Chat room not found" });
+                console.log("senderId", senderId, "receiverId", receiverId, "message", message);
+
+                // Create new notification object
+                const newNotification = {
+                    title,
+                    receiver: receiverId,
+                    type,
+                    message,
+                    createdAt: new Date(),
+                    isRead: false
+                };
+
+                // Add sender if provided
+                if (senderId) {
+                    newNotification.sender = senderId;
                 }
 
-                // Reset unread counter only if this user is the receiver
-                if (chatRoom.receiver.toString() === userId || chatRoom.sender.toString() === userId) {
-                    // Mark messages as read
-                    await Message.updateMany(
-                        {
-                            chatRoom: chatRoomId,
-                            sender: { $ne: userId }, // Only mark messages not sent by this user
-                            isRead: false
-                        },
-                        { isRead: true }
-                    );
+                // Save to database
+                const savedNotification = await Notification.create(newNotification);
+                console.log('Notification created successfully');
 
-                    // Reset unread count
-                    chatRoom.unreadCount = 0;
-                    await chatRoom.save();
+                // Populate receiver
+                let populatedNotification = await Notification.findById(savedNotification._id)
+                    .populate("receiver", "firstName lastName");
 
-                    // Get the updated chat room
-                    const updatedChatRoom = await ChatRoom.findById(chatRoomId)
-                        .populate("sender", "firstName lastName avatar")
-                        .populate("receiver", "firstName lastName avatar")
-                        .populate({
-                            path: "lastMessage",
-                            populate: {
-                                path: "sender",
-                                select: "firstName lastName avatar"
-                            }
-                        });
+                // Populate sender only if it exists
+                if (senderId) {
+                    populatedNotification = await populatedNotification.populate("sender", "firstName lastName");
+                }
 
-                    // Notify both users about the update
-                    io.to(chatRoom.sender.toString()).emit("chat_room_updated", updatedChatRoom);
-                    io.to(chatRoom.receiver.toString()).emit("chat_room_updated", updatedChatRoom);
+                // Emit full notification to receiver if online
+                if (onlineUsers.has(receiverId.toString())) {
+                    io.to(receiverId.toString()).emit("received_notification", populatedNotification);
+                }
 
-                    socket.emit("messages_marked_read");
+                // Optional: Send a simplified alert to receiver
+                const senderName = populatedNotification.sender?.firstName || 'System';
+                io.to(receiverId.toString()).emit("new_notification_alert", {
+                    title: `New ${type} from ${senderName}`,
+                    message
+                });
+
+            } catch (err) {
+                console.error("Error sending notification:", err);
+                socket.emit("notification_error", { message: "Failed to send notification" });
+            }
+        });
+
+        // Get user notifications
+        socket.on("get_notifications", async (userId) => {
+            try {
+                console.log("userId", userId);
+                const notifications = await Notification.find({ receiver: userId })
+                    .populate("sender", "firstName lastName profilePicture")
+                    .sort({ createdAt: -1 })
+                    .limit(20)
+                    .lean(); // Use lean() for better performance
+
+                // Add 'isOnline' status for each notification sender
+                const enhancedNotifications = notifications.map(notification => {
+                    return {
+                        ...notification,
+                        sender: notification.sender ? {
+                            ...notification.sender,
+                            isOnline: onlineUsers.has(notification.sender._id.toString())
+                        } : null
+                    };
+                });
+
+                socket.emit("user_notifications", enhancedNotifications);
+            } catch (err) {
+                console.error("Error getting notifications:", err);
+                socket.emit("notification_error", {
+                    message: "Failed to load notifications",
+                    error: err.message
+                });
+            }
+        });
+
+
+        // Mark notification as read
+        socket.on("mark_notification_read", async (notificationId) => {
+            try {
+                const updatedNotification = await Notification.findByIdAndUpdate(
+                    notificationId,
+                    { isRead: true },
+                    { new: true }
+                ).populate("sender", "firstName lastName");
+
+                if (updatedNotification) {
+                    socket.emit("notification_marked_read", updatedNotification);
                 }
             } catch (err) {
-                console.error("Error marking messages as read:", err);
-                socket.emit("error", { message: "Failed to mark messages as read" });
+                console.error("Error marking notification as read:", err);
             }
         });
 
-        // Add this to your existing socket.io setup
-
-        // Socket event handler for searching chatrooms
-        socket.on("search_chatrooms", async (data) => {
-            try {
-                const { userId, searchQuery } = data;
-
-                if (!searchQuery || !userId) {
-                    return socket.emit("search_chatrooms_error", {
-                        success: false,
-                        message: "User ID and search query are required"
-                    });
-                }
-
-                // Find all chatrooms where the user is either sender or receiver
-                const userChatRooms = await ChatRoom.find({
-                    $or: [
-                        { sender: userId },
-                        { receiver: userId }
-                    ]
-                })
-                    .populate("sender", "firstName lastName avatar")
-                    .populate("receiver", "firstName lastName avatar")
-                    .populate({
-                        path: "lastMessage",
-                        populate: {
-                            path: "sender",
-                            select: "firstName lastName avatar"
-                        }
-                    });
-
-                // Get all chatroom IDs
-                const chatRoomIds = userChatRooms.map(room => room._id);
-
-                // Find messages matching the search query
-                const matchingMessages = await Message.find({
-                    chatRoom: { $in: chatRoomIds },
-                    message: { $regex: searchQuery, $options: 'i' } // Case-insensitive search
-                })
-                    .populate("sender", "firstName lastName avatar");
-
-                // Group messages by chatroom
-                const messagesByChatRoom = {};
-                matchingMessages.forEach(msg => {
-                    const chatRoomId = msg.chatRoom.toString();
-                    if (!messagesByChatRoom[chatRoomId]) {
-                        messagesByChatRoom[chatRoomId] = [];
-                    }
-                    messagesByChatRoom[chatRoomId].push(msg);
-                });
-
-                // Format search results
-                const searchResults = userChatRooms
-                    .filter(room => messagesByChatRoom[room._id.toString()])
-                    .map(room => {
-                        // Get the other user (not the current user)
-                        const otherUser = room.sender._id.toString() === userId ?
-                            room.receiver : room.sender;
-
-                        // Get messages for this chatroom
-                        const messages = messagesByChatRoom[room._id.toString()];
-
-                        return {
-                            chatRoomId: room._id,
-                            otherUser: {
-                                _id: otherUser._id,
-                                name: `${otherUser.firstName || ''} ${otherUser.lastName || ''}`.trim(),
-                                avatar: otherUser.avatar
-                            },
-                            // Include up to 3 matching messages, sorted by most recent first
-                            matchingMessages: messages
-                                .sort((a, b) => b.createdAt - a.createdAt)
-                                .slice(0, 3)
-                                .map(msg => ({
-                                    _id: msg._id,
-                                    message: msg.message,
-                                    sender: {
-                                        _id: msg.sender._id,
-                                        name: `${msg.sender.firstName || ''} ${msg.sender.lastName || ''}`.trim(),
-                                        avatar: msg.sender.avatar
-                                    },
-                                    createdAt: msg.createdAt
-                                })),
-                            matchCount: messages.length,
-                            lastMessage: room.lastMessage ? {
-                                _id: room.lastMessage._id,
-                                message: room.lastMessage.message,
-                                audio: room.lastMessage.audio,
-                                image: room.lastMessage.image,
-                                sender: room.lastMessage.sender ? {
-                                    _id: room.lastMessage.sender._id,
-                                    name: `${room.lastMessage.sender.firstName || ''} ${room.lastMessage.sender.lastName || ''}`.trim()
-                                } : null,
-                                createdAt: room.lastMessage.createdAt
-                            } : null,
-                            unreadCount: room.unreadCount
-                        };
-                    });
-
-                // Send search results back to the client
-                socket.emit("search_chatrooms_results", {
-                    success: true,
-                    count: searchResults.length,
-                    query: searchQuery,
-                    results: searchResults
-                });
-
-            } catch (error) {
-                console.error("Error searching chatrooms:", error);
-                socket.emit("search_chatrooms_error", {
-                    success: false,
-                    message: "Failed to search chatrooms: " + error.message
-                });
-            }
-        });
-
-        // You can also add a handler for searching messages within a specific chatroom
-        socket.on("search_chatroom_messages", async (data) => {
-            try {
-                const { chatRoomId, searchQuery } = data;
-
-                if (!chatRoomId || !searchQuery) {
-                    return socket.emit("search_messages_error", {
-                        success: false,
-                        message: "Chat room ID and search query are required"
-                    });
-                }
-
-                // Verify the chat room exists
-                const chatRoom = await ChatRoom.findById(chatRoomId);
-                if (!chatRoom) {
-                    return socket.emit("search_messages_error", {
-                        success: false,
-                        message: "Chat room not found"
-                    });
-                }
-
-                // Search for messages in this specific chat room
-                const messages = await Message.find({
-                    chatRoom: chatRoomId,
-                    message: { $regex: searchQuery, $options: 'i' }
-                })
-                    .populate("sender", "firstName lastName avatar")
-                    .sort({ createdAt: -1 });
-
-                // Format and send the results
-                socket.emit("search_messages_results", {
-                    success: true,
-                    chatRoomId,
-                    count: messages.length,
-                    query: searchQuery,
-                    messages: messages.map(msg => ({
-                        _id: msg._id,
-                        message: msg.message,
-                        audio: msg.audio,
-                        image: msg.image,
-                        sender: {
-                            _id: msg.sender._id,
-                            name: `${msg.sender.firstName || ''} ${msg.sender.lastName || ''}`.trim(),
-                            avatar: msg.sender.avatar
-                        },
-                        createdAt: msg.createdAt,
-                        isRead: msg.isRead
-                    }))
-                });
-
-            } catch (error) {
-                console.error("Error searching messages:", error);
-                socket.emit("search_messages_error", {
-                    success: false,
-                    message: "Failed to search messages: " + error.message
-                });
-            }
-        });
 
 
 
@@ -522,20 +390,16 @@ const initSocket = (server) => {
     });
 };
 
-// Emit custom events
-const sendNotification = (socketId, event, data) => {
-    if (io) {
-        io.to(socketId).emit(event, data);
-    }
-};
 
-const emitData = (socketId, event, data) => {
-    if (io) {
-        io.to(socketId).emit(event, data);
-    }
-};
 
-module.exports = { initSocket, sendNotification, emitData };
+function getIO() {
+    if (!io) {
+        throw new Error("Socket.io not initialized");
+    }
+    return io;
+}
+
+module.exports = { initSocket, getIO };
 
 
 

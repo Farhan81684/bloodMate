@@ -35,7 +35,7 @@ const userRoutes = require("./src/routes/userRoutes");
 app.use("/api/user", userRoutes);
 
 //server
-
-server.listen(process.env.PORT, () => {
-    log.green("server", `server is running on port ${process.env.PORT}`);
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, '0.0.0.0', () => {
+    log.green("server", `server is running on port ${PORT}`);
 });
