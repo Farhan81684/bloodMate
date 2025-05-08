@@ -24,9 +24,14 @@ router.put('/changePassword', authMiddleware, userController.changePassword);
 router.post('/getUsersByBloodGroup', authMiddleware, userController.getUsersByBloodGroup);
 
 //blood request routes
+router.get('/getBloodTypes', bloodRequestController.getBloodTypes);
 router.post('/addBloodRequest', authMiddleware, bloodRequestController.BloodRequest);
-router.get('/getAllBloodRequests', authMiddleware, bloodRequestController.getAllBloodRequests);
-router.get('/getBloodRequestByBloodGroup', authMiddleware, bloodRequestController.getBloodRequestByBloodGroup);
+router.get('/getBloodRequests', authMiddleware, bloodRequestController.getBloodRequests);
 router.get('/getMyBloodRequests', authMiddleware, bloodRequestController.getMyBloodRequests);
+//find donors
+router.get('/getDonorsByBloodGroup', authMiddleware, bloodRequestController.findDonorByBloodGroup);
+router.get("/requested-blood-groups", bloodRequestController.getRequestedBloodGroups);
+router.post("/getuserbyemail", authMiddleware, userController.getUserByEmail);
+router.post("/create-chat-room", authMiddleware, userController.createChatRoom);
 
 module.exports = router;

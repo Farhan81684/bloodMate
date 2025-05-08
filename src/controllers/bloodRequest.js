@@ -5,6 +5,25 @@ const { sendNotification } = require('../utils/socket');
 
 
 
+// get blood types
+exports.getBloodTypes = async (req, res) => {
+    console.log('Fetching blood types...');
+    try {
+        const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+        return res.status(200).json({
+            success: true,
+            message: 'Blood types fetched successfully.',
+            data: bloodTypes
+        });
+    } catch (error) {
+        console.error('Error fetching blood types:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Internal server error'
+        });
+    }
+}
+
 
 //post blood request
 
@@ -76,31 +95,62 @@ exports.BloodRequest = async (req, res) => {
 
 
 //get all blood requests
-exports.getAllBloodRequests = async (req, res) => {
-    try {
-        const bloodRequests = await BloodRequest.find().populate('userId', 'name profile bloodGroup phoneNo address toggleNotification toggleBloodRequest');
-        return res.status(200).json({
-            success: true,
-            message: 'All blood requests fetched successfully.',
-            data: bloodRequests
-        });
-    } catch (error) {
-        console.error('Error fetching blood requests:', error);
-        return res.status(500).json({
-            success: false,
-            message: error.message || 'Internal server error'
-        });
-    }
-}
+// exports.getAllBloodRequests = async (req, res) => {
+//     try {
+//         const bloodRequests = await BloodRequest.find().populate('userId', 'name profile bloodGroup phoneNo address toggleNotification toggleBloodRequest');
+//         return res.status(200).json({
+//             success: true,
+//             message: 'All blood requests fetched successfully.',
+//             data: bloodRequests
+//         });
+//     } catch (error) {
+//         console.error('Error fetching blood requests:', error);
+//         return res.status(500).json({
+//             success: false,
+//             message: error.message || 'Internal server error'
+//         });
+//     }
+// }
 
-//get blood request by blood group
-exports.getBloodRequestByBloodGroup = async (req, res) => {
+// //get blood request by blood group
+// exports.getBloodRequestByBloodGroup = async (req, res) => {
+//     try {
+//         const { bloodGroup } = req.query;
+//         const bloodRequests = await BloodRequest.find({ BloodType: bloodGroup }).populate('userId', 'name profile bloodGroup phoneNo address toggleNotification toggleBloodRequest').sort({ createdAt: -1 });
+//         return res.status(200).json({
+//             success: true,
+//             message: `Blood requests for ${bloodGroup} fetched successfully.`,
+//             data: bloodRequests
+//         });
+//     } catch (error) {
+//         console.error('Error fetching blood requests:', error);
+//         return res.status(500).json({
+//             success: false,
+//             message: error.message || 'Internal server error'
+//         });
+//     }
+// }
+
+
+exports.getBloodRequests = async (req, res) => {
     try {
         const { bloodGroup } = req.query;
-        const bloodRequests = await BloodRequest.find({ BloodType: bloodGroup }).populate('userId', 'name profile bloodGroup phoneNo address toggleNotification toggleBloodRequest').sort({ createdAt: -1 });
+
+        const filter = bloodGroup ? { BloodType: bloodGroup } : {};
+
+        const bloodRequests = await BloodRequest.find(filter)
+            .populate('userId', 'name profile bloodGroup phoneNo address toggleNotification toggleBloodRequest')
+            .sort({ createdAt: -1 });
+
+        const message = bloodGroup
+            ? `Blood requests for ${bloodGroup} fetched successfully.`
+            : 'All blood requests fetched successfully.';
+
+        console.log(bloodRequests);
+
         return res.status(200).json({
             success: true,
-            message: `Blood requests for ${bloodGroup} fetched successfully.`,
+            message,
             data: bloodRequests
         });
     } catch (error) {
@@ -127,6 +177,57 @@ exports.getMyBloodRequests = async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching my blood requests:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Internal server error'
+        });
+    }
+}
+
+
+
+
+// find donor by blood group find by blood group like blood group: BloofGroup and aavailable: true
+// find by blood group
+exports.findDonorByBloodGroup = async (req, res) => {
+    try {
+        const { bloodGroup } = req.query;
+        if (!bloodGroup) {
+            return res.status(400).json({
+                success: false,
+                message: 'Blood group is required.'
+            });
+        }
+        console.log(bloodGroup);
+        const donors = await User.find({ bloodGroup, toggleBloodRequest: true }).select('name profile bloodGroup phoneNo address toggleNotification toggleBloodRequest');
+        return res.status(200).json({
+            success: true,
+            message: `Donors for ${bloodGroup} fetched successfully.`,
+            data: donors
+        });
+    } catch (error) {
+        console.error('Error fetching donors:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Internal server error'
+        });
+    }
+}
+
+
+
+
+//get requested blood groups if dublicate blood groups are there then send them only once not twice
+exports.getRequestedBloodGroups = async (req, res) => {
+    try {
+        const requestedBloodGroups = await BloodRequest.distinct('BloodType');
+        return res.status(200).json({
+            success: true,
+            message: 'Requested blood groups fetched successfully.',
+            data: requestedBloodGroups
+        });
+    } catch (error) {
+        console.error('Error fetching requested blood groups:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Internal server error'

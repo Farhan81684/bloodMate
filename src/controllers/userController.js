@@ -5,6 +5,7 @@ const validateEmail = require("../utils/emailValidation");
 const generateOTP = require("../utils/otpgenerator");
 const transporter = require("../middlewares/nodemailer");
 const Otp = require("../models/otpModel");
+const ChatRoom = require("../models/chatRoomSchema");
 
 
 exports.signup = async (req, res) => {
@@ -412,3 +413,91 @@ exports.getUsersByBloodGroup = async (req, res) => {
         res.status(500).json({ success: false, message: 'Server Error' });
     }
 }
+
+
+
+
+
+// geet user by email 
+exports.getUserByEmail = async (req, res) => {
+    const { email } = req.body;
+    console.log(email);
+    try {
+        const userfound = await User.findOne({ email: email });
+        
+        if (!userfound) {
+            return res.status(400).json({ message: "Account not found" });
+        }
+        const userId = req.user.userId;
+        const firstName = userfound.name.split(" ")[0];
+        const lastName = userfound.name.split(" ")[1];
+        const profilePicture = userfound.profile ? userfound.profile : null;
+        const user = {
+            _id: userId,
+            firstName: firstName,
+            lastName: lastName,
+            profilePicture: profilePicture,
+        }
+        res.status(200).json({ 
+            success: true,
+            message: "User details fetched successfully", user });
+    }
+    catch (error) {
+        console.log(error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+
+
+// create chat room
+exports.createChatRoom = async (req, res) => {
+  try {
+    const { senderId, receiverId } = req.body;
+
+    if (!senderId || !receiverId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Sender ID and Receiver ID are required',
+      });
+    }
+
+    // Ensure only one chat room exists between two users (either direction)
+    let existingChat = await ChatRoom.findOne({
+      $or: [
+        { sender: senderId, receiver: receiverId },
+        { sender: receiverId, receiver: senderId },
+      ]
+    });
+
+    if (existingChat) {
+      return res.status(200).json({
+        success: true,
+        message: 'Chat room already exists',
+        chatRoom: existingChat
+      });
+    }
+
+    // Create a new chat room
+    const newChat = new ChatRoom({
+      sender: senderId,
+      receiver: receiverId,
+      messages: [],
+      unreadCount: 0,
+    });
+
+    await newChat.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Chat room created successfully',
+      chatRoom: newChat,
+    });
+  } catch (error) {
+    console.error('Chat creation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while creating chat room',
+    });
+  }
+};
