@@ -428,7 +428,7 @@ exports.getUserByEmail = async (req, res) => {
         if (!userfound) {
             return res.status(400).json({ message: "Account not found" });
         }
-        const userId = req.user.userId;
+        const userId = userfound._id;
         const firstName = userfound.name.split(" ")[0];
         const lastName = userfound.name.split(" ")[1];
         const profilePicture = userfound.profile ? userfound.profile : null;
@@ -438,6 +438,7 @@ exports.getUserByEmail = async (req, res) => {
             lastName: lastName,
             profilePicture: profilePicture,
         }
+        console.log(user);
         res.status(200).json({ 
             success: true,
             message: "User details fetched successfully", user });
