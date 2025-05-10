@@ -135,6 +135,7 @@ exports.BloodRequest = async (req, res) => {
 exports.getBloodRequests = async (req, res) => {
     try {
         const { bloodGroup } = req.query;
+         bloodGroup = bloodGroup.trim();
 
         const filter = bloodGroup ? { BloodType: bloodGroup } : {};
 
