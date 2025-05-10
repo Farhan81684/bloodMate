@@ -135,9 +135,7 @@ exports.BloodRequest = async (req, res) => {
 exports.getBloodRequests = async (req, res) => {
     try {
         const { bloodGroup } = req.query;
-         bloodGroup = bloodGroup.trim();
-
-        const filter = bloodGroup ? { BloodType: bloodGroup } : {};
+        const filter = bloodGroup ? { BloodType: bloodGroup.trim() } : {};
 
         const bloodRequests = await BloodRequest.find(filter)
             .populate('userId', 'name profile bloodGroup phoneNo address toggleNotification toggleBloodRequest')
