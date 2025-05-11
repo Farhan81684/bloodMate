@@ -169,6 +169,7 @@ const initSocket = (server) => {
         // Get chat room messages
         socket.on("get_chat_room_messages", async (roomId) => {
             try {
+                console.log("roomId", roomId);
                 const chatRoom = await ChatRoom.findById(roomId);
                 if (!chatRoom) {
                     return socket.emit("error", { message: "Chat room not found" });

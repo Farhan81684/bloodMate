@@ -135,7 +135,11 @@ exports.BloodRequest = async (req, res) => {
 exports.getBloodRequests = async (req, res) => {
     try {
         const { bloodGroup } = req.query;
-        const filter = bloodGroup ? { BloodType: bloodGroup.trim() } : {};
+        const cleanBloodGroup = bloodGroup?.replace(' ', '+'); // fix A+ → A
+
+        const filter = cleanBloodGroup ? { BloodType: cleanBloodGroup.trim() } : {};
+
+        console.log(filter);
 
         const bloodRequests = await BloodRequest.find(filter)
             .populate('userId', 'name profile bloodGroup phoneNo address toggleNotification toggleBloodRequest')
@@ -198,7 +202,10 @@ exports.findDonorByBloodGroup = async (req, res) => {
             });
         }
         console.log(bloodGroup);
-        const donors = await User.find({ bloodGroup, toggleBloodRequest: true }).select('name profile bloodGroup phoneNo address toggleNotification toggleBloodRequest');
+
+        const cleanBloodGroup = bloodGroup?.replace(' ', '+');
+
+        const donors = await User.find({ bloodGroup: cleanBloodGroup, toggleBloodRequest: true }).select('name profile bloodGroup phoneNo address toggleNotification toggleBloodRequest');
         return res.status(200).json({
             success: true,
             message: `Donors for ${bloodGroup} fetched successfully.`,
