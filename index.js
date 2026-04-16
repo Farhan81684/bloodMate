@@ -21,8 +21,8 @@ databaseConnection();
 
 //testing route
 app.get("/", (req, res) => {
-    log.yellow("route", "welcome to LOADBOAD");
-    res.send("welcome to LOADBOAD apis");
+    log.yellow("route", "welcome Farhan to LOADBOAD");
+    res.send("welcome Farhan to LOADBOAD apis");
 });
 
 // socket connection
