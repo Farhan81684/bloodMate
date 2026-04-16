@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bloodmate-config
+data:
+  DATABASE_URL: "mongodb://mongodb-service:27017/bloodmate"
+  NODE_ENV: "production"
